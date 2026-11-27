@@ -1,0 +1,13 @@
+{
+  "name": "pm-7-cloud-shop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "云上小店 - 卖货助手工作台雏形",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}
