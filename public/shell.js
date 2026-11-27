@@ -37,7 +37,10 @@
       Object.keys(buttons).forEach(function (k) {
         buttons[k].classList.toggle('active', k === mod.id);
       });
-      view.innerHTML = '';
+      // 换一个全新的容器，丢弃上一个模块挂在旧容器上的监听
+      var fresh = view.cloneNode(false);
+      view.parentNode.replaceChild(fresh, view);
+      view = fresh;
       try {
         mod.render(view);
       } catch (e) {
