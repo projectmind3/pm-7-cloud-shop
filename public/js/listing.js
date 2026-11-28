@@ -5,6 +5,7 @@
   var PREFIX = 'shop.listing.';
   var KEY_RECORDS = PREFIX + 'records';
   var KEY_DRAFT = PREFIX + 'draft';
+  var KEY_PUBLISHED = PREFIX + 'published';
   var CLS = 'shopls-';
 
   // ---------- 关键词词典（演示级） ----------
@@ -321,6 +322,9 @@
     var outFeel = h('div', CLS + 'out'); textCard.appendChild(outFeel);
     var saveBtn = h('button', CLS + 'btn', '保存记录'); saveBtn.type = 'button';
     textCard.appendChild(saveBtn);
+    var pubBtn = h('button', CLS + 'btn', '上架到メルカリShops'); pubBtn.type = 'button';
+    textCard.appendChild(pubBtn);
+    var pubMsg = h('div', CLS + 'tip'); textCard.appendChild(pubMsg);
 
     var grid = h('div', CLS + 'grid');
     var posterCard = h('div', CLS + 'card');
@@ -359,6 +363,11 @@
     var recCard = h('div', CLS + 'card'); root.appendChild(recCard);
     recCard.appendChild(h('h3', '', '生成记录'));
     var recList = h('div'); recCard.appendChild(recList);
+
+    // 上架记录
+    var pubCard = h('div', CLS + 'card'); root.appendChild(pubCard);
+    pubCard.appendChild(h('h3', '', '上架记录'));
+    var pubList = h('div'); pubCard.appendChild(pubList);
 
     function redraw() {
       if (!state.result) return;
@@ -425,6 +434,59 @@
       });
     }
     renderRecords();
+
+    function renderPublished() {
+      var list = load(KEY_PUBLISHED, []);
+      pubList.innerHTML = '';
+      if (!Array.isArray(list) || !list.length) { pubList.appendChild(h('div', CLS + 'empty', '暂无上架记录')); return; }
+      list.forEach(function (r) {
+        var row = h('div', CLS + 'rec');
+        var left = h('div', '', r.title); left.appendChild(h('small', '', r.time));
+        row.appendChild(left);
+        row.appendChild(h('small', '', '商品ID：' + r.productId));
+        pubList.appendChild(row);
+      });
+    }
+    renderPublished();
+
+    var publishing = false;
+    pubBtn.onclick = function () {
+      if (publishing) return;
+      if (!state.result) { pubMsg.textContent = '请先点击生成'; return; }
+      var name = String(state.result.name).slice(0, 40);
+      var price = state.result.price;
+      if (!isFinite(price) || Math.floor(price) !== price || price < 300) { pubMsg.textContent = '价格需为300日元以上'; return; }
+      if (!window.confirm('确认上架到メルカリShops？\n商品名：' + name + '\n价格：' + yen(price))) return;
+      var body = JSON.stringify({ name: name, description: state.result.intro + '\n\n' + state.result.review, price: price });
+      publishing = true; pubBtn.disabled = true; pubBtn.textContent = '上架中…'; pubMsg.textContent = '';
+      function done(text) {
+        publishing = false; pubBtn.disabled = false; pubBtn.textContent = '上架到メルカリShops';
+        pubMsg.textContent = text;
+      }
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/mercari/listing');
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.onload = function () {
+        var data = null;
+        try { data = JSON.parse(xhr.responseText); } catch (e) { data = null; }
+        if (data && data.ok === true && data.productId != null) {
+          var list = load(KEY_PUBLISHED, []);
+          if (!Array.isArray(list)) list = [];
+          list.unshift({ time: new Date().toLocaleString('zh-CN'), title: name, productId: String(data.productId) });
+          if (list.length > 50) list.length = 50;
+          save(KEY_PUBLISHED, list);
+          renderPublished();
+          done('已上架到メルカリShops（商品ID：' + data.productId + '）');
+        } else if (data && data.error) {
+          done(String(data.error));
+        } else {
+          done('网络异常，请稍后再试');
+        }
+      };
+      xhr.onerror = function () { done('网络异常，请稍后再试'); };
+      xhr.ontimeout = xhr.onerror;
+      try { xhr.send(body); } catch (e) { done('网络异常，请稍后再试'); }
+    };
 
     // 恢复上次草稿（不自动生成）
     var draft = load(KEY_DRAFT, null);
